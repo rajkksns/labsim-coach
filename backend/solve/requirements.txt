@@ -1,1 +1,1 @@
-numpy==1.26.4
+# No third-party dependencies — pure-Python solver (builds without Docker).

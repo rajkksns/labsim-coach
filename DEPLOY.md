@@ -190,5 +190,5 @@ aws s3 rb s3://labsim-coach-<yourname> --force   # if you used 6B
 | `curl /solve` returns 500 | Check `sam logs -n SolveFunction --stack-name labsim-coach --tail` |
 | Coach returns `AccessDenied` | Bedrock model not enabled (Step 3) or wrong region |
 | Frontend can't reach API (CORS) | Confirm `config.js` URL has **no trailing slash**; CORS is already enabled in the template |
-| numpy import error in Lambda | `sam build` must run on the same architecture; use `sam build --use-container` |
+| Build error in Lambda | Solver is pure Python (no numpy) — a plain `sam build` works with no Docker |
 | Coach says "coach_error" | Model ID mismatch — redeploy with the correct `BedrockModelId` |

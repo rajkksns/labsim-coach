@@ -3,5 +3,5 @@
    It looks like: https://abc123xyz.execute-api.us-east-1.amazonaws.com
    Leave empty ("") to run the offline local preview. */
 window.LABSIM_CONFIG = {
-  apiBaseUrl: ""
+  apiBaseUrl: "https://e7t0ucicw5.execute-api.us-east-1.amazonaws.com"
 };

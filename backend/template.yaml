@@ -8,7 +8,7 @@ Globals:
   Function:
     Timeout: 30
     MemorySize: 256
-    Runtime: python3.12
+    Runtime: python3.13
 
 Parameters:
   BedrockModelId:

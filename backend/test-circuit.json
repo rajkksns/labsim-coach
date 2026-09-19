@@ -1,0 +1,1 @@
+{"nodes": ["n1", "n2", "n3", "n0"], "components": [{"id": "B1", "type": "battery", "a": "n1", "b": "n0", "value": 9}, {"id": "R1", "type": "resistor", "a": "n1", "b": "n2", "value": 330}, {"id": "D1", "type": "led", "a": "n2", "b": "n3", "vf": 2}, {"id": "W1", "type": "wire", "a": "n3", "b": "n0"}]}

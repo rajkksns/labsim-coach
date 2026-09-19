@@ -1,14 +1,32 @@
 """LabSim Coach — /solve Lambda
 Modified Nodal Analysis (MNA) DC circuit solver.
+Pure Python (no numpy) so it builds with plain `sam build` — no Docker needed.
 Supports: battery, resistor, LED (diode model), wire, switch.
-No external deps beyond numpy (bundled as a Lambda layer or in the package).
 """
 import json
-import numpy as np
 
 R_ON = 15.0      # LED on-resistance (ohms)
 I_LIT = 1e-3     # >= 1 mA => visibly lit
 GMIN = 1e-9      # tiny leak-to-ground to stabilize floating nodes
+
+
+def gauss_solve(A, b):
+    """Solve A x = b via Gauss-Jordan elimination with partial pivoting."""
+    n = len(A)
+    M = [row[:] + [b[i]] for i, row in enumerate(A)]
+    for col in range(n):
+        piv = max(range(col, n), key=lambda r: abs(M[r][col]))
+        if abs(M[piv][col]) < 1e-15:
+            return None
+        M[col], M[piv] = M[piv], M[col]
+        pivval = M[col][col]
+        for r in range(n):
+            if r != col:
+                f = M[r][col] / pivval
+                if f != 0.0:
+                    for c in range(col, n + 1):
+                        M[r][c] -= f * M[col][c]
+    return [M[i][n] / M[i][i] for i in range(n)]
 
 
 def solve_circuit(circuit):
@@ -50,20 +68,21 @@ def solve_circuit(circuit):
 
     def build_and_solve(led_state):
         M = len(batteries)
-        A = np.zeros((N + M, N + M))
-        z = np.zeros(N + M)
+        dim = N + M
+        A = [[0.0] * dim for _ in range(dim)]
+        z = [0.0] * dim
         for r in free:
-            A[idx[r], idx[r]] += GMIN
+            A[idx[r]][idx[r]] += GMIN
 
         def gstamp(a, b, g):
             a, b = find(a), find(b)
             if a != ground:
-                A[idx[a], idx[a]] += g
+                A[idx[a]][idx[a]] += g
             if b != ground:
-                A[idx[b], idx[b]] += g
+                A[idx[b]][idx[b]] += g
             if a != ground and b != ground:
-                A[idx[a], idx[b]] -= g
-                A[idx[b], idx[a]] -= g
+                A[idx[a]][idx[b]] -= g
+                A[idx[b]][idx[a]] -= g
 
         def isrc(a, b, i):
             a, b = find(a), find(b)
@@ -84,20 +103,19 @@ def solve_circuit(circuit):
             row = N + k
             pa, pb = find(b["a"]), find(b["b"])
             if pa != ground:
-                A[idx[pa], row] += 1
-                A[row, idx[pa]] += 1
+                A[idx[pa]][row] += 1
+                A[row][idx[pa]] += 1
             if pb != ground:
-                A[idx[pb], row] -= 1
-                A[row, idx[pb]] -= 1
+                A[idx[pb]][row] -= 1
+                A[row][idx[pb]] -= 1
             z[row] = float(b["value"])
 
-        try:
-            x = np.linalg.solve(A, z)
-        except np.linalg.LinAlgError:
+        x = gauss_solve(A, z)
+        if x is None:
             return None
         v = {ground: 0.0}
         for r in free:
-            v[r] = float(x[idx[r]])
+            v[r] = x[idx[r]]
         return v
 
     # iterate LED on/off states until self-consistent
