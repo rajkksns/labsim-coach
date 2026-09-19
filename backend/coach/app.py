@@ -1,14 +1,17 @@
 """LabSim Coach — /coach Lambda
 Socratic AI tutor. Takes the student's circuit + solver result + their question,
 and returns a hint that guides them toward the fix WITHOUT giving the full answer.
-Uses Amazon Bedrock (Anthropic Claude).
+
+Uses Amazon Bedrock. Works with BOTH Amazon Nova (Converse API) and Anthropic
+Claude — it uses the Bedrock `converse` API, which normalizes the request/response
+format across model families, so you can switch BedrockModelId freely.
 """
 import json
 import os
 import boto3
 
 REGION = os.environ.get("BEDROCK_REGION", "us-east-1")
-MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "anthropic.claude-3-5-sonnet-20240620-v1:0")
+MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "amazon.nova-lite-v1:0")
 
 bedrock = boto3.client("bedrock-runtime", region_name=REGION)
 
@@ -56,16 +59,16 @@ def handler(event, context):
         return {"statusCode": 200, "headers": CORS, "body": ""}
     try:
         payload = json.loads(event.get("body") or "{}")
-        body = {
-            "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 300,
-            "temperature": 0.6,
-            "system": SYSTEM_PROMPT,
-            "messages": [{"role": "user", "content": build_user_message(payload)}],
-        }
-        resp = bedrock.invoke_model(modelId=MODEL_ID, body=json.dumps(body))
-        data = json.loads(resp["body"].read())
-        hint = data["content"][0]["text"].strip()
+        user_msg = build_user_message(payload)
+
+        # Bedrock Converse API — one format for Nova, Claude, Llama, etc.
+        resp = bedrock.converse(
+            modelId=MODEL_ID,
+            system=[{"text": SYSTEM_PROMPT}],
+            messages=[{"role": "user", "content": [{"text": user_msg}]}],
+            inferenceConfig={"maxTokens": 300, "temperature": 0.6},
+        )
+        hint = resp["output"]["message"]["content"][0]["text"].strip()
         return {"statusCode": 200, "headers": {**CORS, "Content-Type": "application/json"},
                 "body": json.dumps({"ok": True, "hint": hint})}
     except Exception as e:  # noqa

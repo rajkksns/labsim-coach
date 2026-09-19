@@ -13,7 +13,7 @@ Globals:
 Parameters:
   BedrockModelId:
     Type: String
-    Default: anthropic.claude-3-5-sonnet-20240620-v1:0
+    Default: amazon.nova-lite-v1:0
     Description: Bedrock model ID for the coach tutor.
   BedrockRegion:
     Type: String
