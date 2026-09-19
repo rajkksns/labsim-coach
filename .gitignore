@@ -23,3 +23,7 @@ Thumbs.db
 .env
 *.pem
 aws-credentials*
+
+# Q CLI installer (downloaded during setup — do not commit)
+amazon-q.deb
+*.deb
