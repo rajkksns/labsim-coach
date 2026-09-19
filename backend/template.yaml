@@ -1,0 +1,78 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  LabSim Coach backend — circuit solver (/solve) + Socratic AI tutor (/coach)
+  API Gateway (HTTP API) + two Python Lambdas. Bedrock for the tutor.
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 256
+    Runtime: python3.12
+
+Parameters:
+  BedrockModelId:
+    Type: String
+    Default: anthropic.claude-3-5-sonnet-20240620-v1:0
+    Description: Bedrock model ID for the coach tutor.
+  BedrockRegion:
+    Type: String
+    Default: us-east-1
+
+Resources:
+
+  LabSimApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+        AllowHeaders:
+          - "Content-Type"
+        AllowMethods:
+          - "POST"
+          - "OPTIONS"
+
+  SolveFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: solve/
+      Handler: app.handler
+      Description: MNA DC circuit solver.
+      Events:
+        Solve:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref LabSimApi
+            Path: /solve
+            Method: POST
+
+  CoachFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: coach/
+      Handler: app.handler
+      Description: Socratic AI tutor backed by Bedrock.
+      Environment:
+        Variables:
+          BEDROCK_MODEL_ID: !Ref BedrockModelId
+          BEDROCK_REGION: !Ref BedrockRegion
+      Policies:
+        - Statement:
+            - Sid: BedrockInvoke
+              Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+              Resource: "*"
+      Events:
+        Coach:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref LabSimApi
+            Path: /coach
+            Method: POST
+
+Outputs:
+  ApiBaseUrl:
+    Description: Base URL for the LabSim Coach API. Put this in the frontend config.
+    Value: !Sub "https://${LabSimApi}.execute-api.${AWS::Region}.amazonaws.com"

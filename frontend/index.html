@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>LabSim Coach — Electronics Lab Tutor</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2333; --line:#30363d;
+    --ink:#e6edf3; --muted:#9aa7b4; --accent:#4f8cff; --accent2:#7c5cff;
+    --ok:#3fb950; --warn:#f0883e; --bad:#f85149; --wire:#e3b341;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--ink);height:100vh;overflow:hidden}
+  header{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--panel)}
+  header h1{font-size:18px;margin:0;font-weight:650}
+  header .badge{font-size:11px;color:var(--muted);border:1px solid var(--line);padding:2px 8px;border-radius:20px}
+  .layout{display:grid;grid-template-columns:190px 1fr 340px;height:calc(100vh - 53px)}
+  .palette{background:var(--panel);border-right:1px solid var(--line);padding:14px;overflow:auto}
+  .palette h3{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:0 0 10px}
+  .comp{display:flex;align-items:center;gap:8px;padding:9px 10px;margin-bottom:8px;background:var(--panel2);
+        border:1px solid var(--line);border-radius:8px;cursor:grab;font-size:13px;user-select:none;transition:.15s}
+  .comp:hover{border-color:var(--accent);transform:translateX(2px)}
+  .comp svg{flex:none}
+  .stage{position:relative;overflow:hidden;background:
+        radial-gradient(circle at 1px 1px,#1e2733 1px,transparent 0) 0 0/26px 26px, var(--bg)}
+  #canvas{width:100%;height:100%;display:block;touch-action:none}
+  .sidebar{background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column}
+  .toolbar{padding:12px 14px;border-bottom:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap}
+  button{font-family:inherit;font-size:13px;border-radius:8px;border:1px solid var(--line);
+         background:var(--panel2);color:var(--ink);padding:8px 12px;cursor:pointer;transition:.15s}
+  button:hover{border-color:var(--accent)}
+  button.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;font-weight:600}
+  button.ghost{background:transparent}
+  .coach{flex:1;overflow:auto;padding:14px}
+  .coach h3{font-size:13px;margin:0 0 10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .bubble{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;
+          margin-bottom:12px;font-size:14px;line-height:1.5;animation:fade .3s}
+  .bubble.coach-msg{border-left:3px solid var(--accent2)}
+  .bubble.result{border-left:3px solid var(--ok)}
+  .bubble.err{border-left:3px solid var(--bad)}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1}}
+  .ask{padding:12px 14px;border-top:1px solid var(--line);display:flex;gap:8px}
+  .ask input{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--ink);padding:9px 11px;font-size:13px}
+  .status{font-size:12px;color:var(--muted);padding:2px 6px}
+  .pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;margin:2px 4px 2px 0}
+  .pill.on{background:rgba(63,185,80,.15);color:var(--ok);border:1px solid var(--ok)}
+  .pill.off{background:rgba(248,81,73,.12);color:var(--bad);border:1px solid var(--bad)}
+  .hint{color:var(--muted);font-size:12px;margin-top:6px}
+  .node-dot{cursor:pointer}
+  .selected{outline:2px dashed var(--accent);outline-offset:3px}
+</style>
+</head>
+<body>
+<header>
+  <h1>⚡ LabSim Coach</h1>
+  <span class="badge">Virtual Electronics Lab · Socratic AI Tutor</span>
+  <span style="flex:1"></span>
+  <span class="status" id="conn">● local</span>
+</header>
+
+<div class="layout">
+  <!-- PALETTE -->
+  <div class="palette">
+    <h3>Components</h3>
+    <div class="comp" draggable="true" data-type="battery">🔋 Battery 9V</div>
+    <div class="comp" draggable="true" data-type="resistor">〰️ Resistor 330Ω</div>
+    <div class="comp" draggable="true" data-type="led">💡 LED (Vf 2V)</div>
+    <div class="comp" draggable="true" data-type="switch">🔘 Switch</div>
+    <h3 style="margin-top:20px">How to wire</h3>
+    <p class="hint">Drag parts onto the board. Click a component's <b>terminal dot</b>, then click another
+      terminal to connect them with a wire. Click a switch body to toggle open/closed. Double-click a part to delete.</p>
+  </div>
+
+  <!-- STAGE -->
+  <div class="stage">
+    <svg id="canvas"></svg>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="toolbar">
+      <button class="primary" id="runBtn">▶ Run Simulation</button>
+      <button class="ghost" id="clearBtn">Clear</button>
+      <button class="ghost" id="sampleBtn">Load Example</button>
+    </div>
+    <div class="coach" id="coach">
+      <h3>🎓 Coach</h3>
+      <div class="bubble coach-msg">Hi! I'm your lab coach. Build a circuit, hit <b>Run</b>, and ask me
+        anything like "why won't my LED light?" I'll nudge you toward the answer — not hand it over. 😊</div>
+    </div>
+    <div class="ask">
+      <input id="q" placeholder="Ask the coach… e.g. why is my LED off?" />
+      <button class="primary" id="askBtn">Ask</button>
+    </div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script>
+/* ================= LabSim Coach front-end ================= */
+const API = (window.LABSIM_CONFIG && window.LABSIM_CONFIG.apiBaseUrl) || "";
+document.getElementById('conn').textContent = API ? '● connected' : '● local (set config.js)';
+
+const svg = document.getElementById('canvas');
+const NS = 'http://www.w3.org/2000/svg';
+let parts = [];        // {id,type,x,y,value,vf,closed,terms:{a:{x,y},b:{x,y}}}
+let wires = [];        // {from:{part,term}, to:{part,term}}
+let seq = 0, pick = null, lastResult = null, drag = null;
+
+function uid(p){ return p + (++seq); }
+function el(tag, attrs){ const e=document.createElementNS(NS,tag); for(const k in attrs) e.setAttribute(k,attrs[k]); return e; }
+
+/* ---- component geometry: two terminals a (left/+) and b (right/-) ---- */
+function termPos(p){
+  return { a:{x:p.x-34,y:p.y}, b:{x:p.x+34,y:p.y} };
+}
+
+function addPart(type, x, y){
+  const p = { id:uid(type[0].toUpperCase()), type, x, y,
+              value: type==='battery'?9:(type==='resistor'?330:undefined),
+              vf: type==='led'?2:undefined,
+              closed: type==='switch'?true:undefined };
+  parts.push(p); render();
+}
+
+function draw(){
+  svg.innerHTML='';
+  // wires first
+  for(const w of wires){
+    const A=termPos(byId(w.from.part))[w.from.term], B=termPos(byId(w.to.part))[w.to.term];
+    svg.appendChild(el('line',{x1:A.x,y1:A.y,x2:B.x,y2:B.y,stroke:'var(--wire)','stroke-width':3,'stroke-linecap':'round'}));
+  }
+  for(const p of parts) drawPart(p);
+  if(pick){ const t=termPos(byId(pick.part))[pick.term];
+    svg.appendChild(el('circle',{cx:t.x,cy:t.y,r:9,fill:'none',stroke:'var(--accent)','stroke-width':2})); }
+}
+function byId(id){ return parts.find(p=>p.id===id); }
+
+function drawPart(p){
+  const g=el('g',{}); const t=termPos(p);
+  // body
+  const lit = lastResult && lastResult.leds && lastResult.leds[p.id]==='on';
+  const bodyFill = p.type==='led' ? (lit?'#ffd23f':'#3a3f4b') : 'var(--panel2)';
+  const rect=el('rect',{x:p.x-24,y:p.y-16,width:48,height:32,rx:8,fill:bodyFill,stroke:'var(--line)'});
+  g.appendChild(rect);
+  if(p.type==='led' && lit){
+    g.appendChild(el('circle',{cx:p.x,cy:p.y,r:26,fill:'#ffd23f',opacity:.25}));
+  }
+  const label={battery:'🔋',resistor:'〰️',led:'💡',switch:p.closed?'🔘':'⭕'}[p.type];
+  const txt=el('text',{x:p.x,y:p.y+6,'text-anchor':'middle','font-size':18});
+  txt.textContent=label; g.appendChild(txt);
+  // value caption
+  const cap=el('text',{x:p.x,y:p.y+30,'text-anchor':'middle','font-size':11,fill:'var(--muted)'});
+  cap.textContent = p.type==='battery'?p.value+'V':p.type==='resistor'?p.value+'Ω':p.type==='led'?p.id:(p.closed?'closed':'open');
+  g.appendChild(cap);
+  const idt=el('text',{x:p.x,y:p.y-22,'text-anchor':'middle','font-size':10,fill:'var(--muted)'});
+  idt.textContent=p.id; g.appendChild(idt);
+  // terminals
+  for(const term of ['a','b']){
+    const c=el('circle',{cx:t[term].x,cy:t[term].y,r:6,fill: term==='a'?'#f85149':'#58a6ff',
+                          stroke:'#0d1117','stroke-width':2,class:'node-dot'});
+    c.addEventListener('click',(e)=>{ e.stopPropagation(); onTerm(p.id,term); });
+    g.appendChild(c);
+    svg.appendChild(el('line',{x1:p.x+(term==='a'?-24:24),y1:p.y,x2:t[term].x,y2:t[term].y,stroke:'var(--line)','stroke-width':2}));
+  }
+  // interactions
+  rect.style.cursor='grab';
+  rect.addEventListener('mousedown',(e)=>{ drag={id:p.id,dx:e.offsetX-p.x,dy:e.offsetY-p.y}; });
+  txt.addEventListener('click',()=>{ if(p.type==='switch'){ p.closed=!p.closed; render(); } });
+  g.addEventListener('dblclick',()=>{ parts=parts.filter(x=>x.id!==p.id);
+    wires=wires.filter(w=>w.from.part!==p.id&&w.to.part!==p.id); render(); });
+  svg.appendChild(g);
+}
+
+function onTerm(part,term){
+  if(!pick){ pick={part,term}; }
+  else if(pick.part===part && pick.term===term){ pick=null; }
+  else { wires.push({from:pick,to:{part,term}}); pick=null; }
+  render();
+}
+
+svg.addEventListener('mousemove',(e)=>{ if(drag){ const p=byId(drag.id); p.x=e.offsetX-drag.dx; p.y=e.offsetY-drag.dy; render(); }});
+window.addEventListener('mouseup',()=> drag=null);
+svg.addEventListener('dragover',e=>e.preventDefault());
+svg.addEventListener('drop',e=>{ e.preventDefault(); const type=e.dataTransfer.getData('type');
+  const r=svg.getBoundingClientRect(); addPart(type,e.clientX-r.left,e.clientY-r.top); });
+document.querySelectorAll('.comp').forEach(c=>{
+  c.addEventListener('dragstart',e=>e.dataTransfer.setData('type',c.dataset.type)); });
+
+function render(){ draw(); }
+
+/* ---------- build netlist: merge terminals connected by wires into nodes ---------- */
+function buildCircuit(){
+  const key=(part,term)=>part+'.'+term;
+  const parent={};
+  const find=x=>{ parent[x]=parent[x]||x; while(parent[x]!==x){ parent[x]=parent[parent[x]]; x=parent[x]; } return x; };
+  const union=(a,b)=>{ parent[find(a)]=find(b); };
+  for(const p of parts){ find(key(p.id,'a')); find(key(p.id,'b')); }
+  for(const w of wires){ union(key(w.from.part,w.from.term), key(w.to.part,w.to.term)); }
+  const nodeName={}; let n=0; const nodes=[];
+  const nodeOf=(part,term)=>{ const r=find(key(part,term)); if(!(r in nodeName)){ nodeName[r]='n'+(n++); nodes.push(nodeName[r]); } return nodeName[r]; };
+  const components=parts.map(p=>{
+    const base={id:p.id,type:p.type,a:nodeOf(p.id,'a'),b:nodeOf(p.id,'b')};
+    if(p.type==='battery') base.value=p.value;
+    if(p.type==='resistor') base.value=p.value;
+    if(p.type==='led') base.vf=p.vf;
+    if(p.type==='switch') base.closed=p.closed;
+    return base;
+  });
+  return {nodes,components};
+}
+
+/* ---------- coach panel helpers ---------- */
+function bubble(text,cls){ const c=document.getElementById('coach');
+  const b=document.createElement('div'); b.className='bubble '+(cls||''); b.innerHTML=text; c.appendChild(b); c.scrollTop=c.scrollHeight; }
+
+async function run(){
+  const circuit=buildCircuit();
+  if(!circuit.components.length){ bubble('Add some components first! Drag a battery, resistor and LED onto the board.','err'); return; }
+  let res;
+  try{
+    if(API){ const r=await fetch(API+'/solve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(circuit)}); res=await r.json(); }
+    else { res=localSolveStub(circuit); }
+  }catch(err){ bubble('Could not reach the solver: '+err.message,'err'); return; }
+  lastResult=res; render();
+  if(!res.ok){ bubble('⚠️ '+res.reason,'err'); return; }
+  const pills=Object.entries(res.leds||{}).map(([k,v])=>`<span class="pill ${v}">${k}: ${v.toUpperCase()}</span>`).join('');
+  let html='<b>Simulation complete.</b><br>'+(pills||'No LEDs in circuit.');
+  if(res.reasons && res.reasons.length){ html+='<div class="hint">'+res.reasons.join('<br>')+'</div>'; }
+  bubble(html,'result');
+}
+
+async function ask(){
+  const q=document.getElementById('q'); const question=q.value.trim(); if(!question) return;
+  bubble('🙋 '+question); q.value='';
+  if(!lastResult){ bubble('Run the simulation first so I can see your circuit! ▶','coach-msg'); return; }
+  if(!API){ bubble("(Set config.js with your API URL to enable the live AI coach.) Hint: check the detected issues above and think about current direction.",'coach-msg'); return; }
+  bubble('<i>thinking…</i>','coach-msg');
+  try{
+    const r=await fetch(API+'/coach',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({circuit:buildCircuit(),result:lastResult,question})});
+    const d=await r.json();
+    document.querySelector('#coach .bubble:last-child').remove();
+    bubble('🎓 '+(d.ok? d.hint : ('Coach error: '+d.reason)),'coach-msg');
+  }catch(err){ bubble('Coach unreachable: '+err.message,'err'); }
+}
+
+/* fallback local solver stub (only used when API not configured, for offline demo) */
+function localSolveStub(c){
+  const hasBat=c.components.some(x=>x.type==='battery');
+  if(!hasBat) return {ok:false,reason:"There's no battery — nothing can drive current."};
+  return {ok:true,node_voltages:{},currents:{},leds:Object.fromEntries(
+    c.components.filter(x=>x.type==='led').map(l=>[l.id,'off'])),
+    reasons:["(Local preview — deploy the backend for real analysis.)"]};
+}
+
+function loadExample(){
+  parts=[]; wires=[]; seq=0; lastResult=null;
+  addPart('battery',180,240); addPart('resistor',360,160); addPart('led',540,240);
+  const [B,R,D]=parts;
+  wires.push({from:{part:B.id,term:'a'},to:{part:R.id,term:'a'}});
+  wires.push({from:{part:R.id,term:'b'},to:{part:D.id,term:'a'}});
+  wires.push({from:{part:D.id,term:'b'},to:{part:B.id,term:'b'}});
+  render();
+  bubble('Loaded a classic 9V → 330Ω → LED loop. Hit ▶ Run and see if it lights!','coach-msg');
+}
+
+document.getElementById('runBtn').onclick=run;
+document.getElementById('askBtn').onclick=ask;
+document.getElementById('clearBtn').onclick=()=>{ parts=[];wires=[];lastResult=null;pick=null;render(); };
+document.getElementById('sampleBtn').onclick=loadExample;
+document.getElementById('q').addEventListener('keydown',e=>{ if(e.key==='Enter') ask(); });
+render();
+</script>
+</body>
+</html>

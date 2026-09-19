@@ -1,0 +1,25 @@
+# AWS SAM
+.aws-sam/
+samconfig.toml
+packaged.yaml
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Node (if you add tooling later)
+node_modules/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Secrets — never commit these
+.env
+*.pem
+aws-credentials*
